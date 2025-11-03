@@ -81,8 +81,6 @@ def main():
     )
     print("Step 12: Maps are prepared, and saved")
 
-    exit(0)
-
 final_score = main()
 
-# 사용법: python -m scripts.run_pipeline
+# python -m scripts.run_pipeline
