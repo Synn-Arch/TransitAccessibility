@@ -6,18 +6,18 @@ from typing import Set
 from shapely.geometry import box
 
 def download_drivenetwork(place):
-    poly = place.union_all()             # dissolve multipart geometries if any
+    poly = place.union_all()
 
     desired_types = {
         "trunk","primary","secondary","tertiary",
         "residential","living_street","pedestrian"
     }
 
-    G_Drive = ox.graph_from_polygon(            # Overpass returns only edges intersecting `poly`
+    G_Drive = ox.graph_from_polygon(
         poly,
         network_type="drive",
-        retain_all=False,             # keep largest component only (faster later)
-        truncate_by_edge=True         # cuts edges at polygon boundary
+        retain_all=False,
+        truncate_by_edge=True
     )
 
     # optional post-filter for highway classes

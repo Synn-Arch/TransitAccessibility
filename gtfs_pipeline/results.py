@@ -14,7 +14,7 @@ def combine_scores(
     place_geometry,
 ) -> Tuple[Optional[gpd.GeoDataFrame], Optional[gpd.GeoDataFrame], gpd.GeoDataFrame, gpd.GeoDataFrame]:
     
-    # Interpolation: u,v,key 기준으로 도로 위 점 생성
+    # Interpolate points along streets using the provided geometry
     points = interpolate_roads(streets, target_crs=streets.crs)
     streets_gdf = streets.to_crs(bus_result_iso.crs)
 
@@ -33,11 +33,11 @@ def combine_scores(
     elif has_rail:
         all_result_iso = rail_result_iso
     else:
-        raise ValueError("버스와 철도 둘 다 없어서 scoring을 할 수 없습니다.")
+        raise ValueError("Scoring cannot be combined: both bus_result_iso and rail_result_iso are None or empty.")
 
     concat_score = scoring(points, all_result_iso, streets)
 
-    # bus+rail aggregate: 하나가 없으면 concat_score로 대체
+    # Aggregate bus and rail scores
     bus_rail_score = (bus_score.copy() if bus_score is not None else concat_score.copy())
     bus_rail_score['Score_Bus'] = bus_score['Score'] if bus_score is not None else 0
     bus_rail_score['Score_Rail'] = rail_score['Score'] if rail_score is not None else 0

@@ -15,7 +15,7 @@ def stop_significance(
     tag: str
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
 
-    # 0) 입력 데이터 분리
+    # 0) Divide stops by mode
     busstops_gdf  = stops_within_iso[stops_within_iso['route_type'] == 3].copy()
     railstops_gdf = stops_within_iso[stops_within_iso['route_type'].isin([0, 1, 2, 5, 12])].copy()
 
@@ -57,7 +57,7 @@ def stop_significance(
     factor_f_bus  = compute_factor_f(sched_bus)
     factor_f_rail = compute_factor_f(sched_rail)
 
-    # 4) Factor Q (시설 점수)
+    # 4) Factor Q
     bus_factor_q = compute_factor_q(
         busstops_gdf=busstops_gdf,
         tag=tag,
@@ -65,7 +65,7 @@ def stop_significance(
     )
     rail_factor_q_scalar = 2.5
 
-    # 5) 버스 Significance
+    # 5) Bus Stop Significance
     bus_analysis = (
         busstops_gdf[['stop_id', 'route_type']]
         .merge(factor_e_bus[['stop_id','routes','factor_e']], on='stop_id', how='left')
@@ -89,7 +89,7 @@ def stop_significance(
 
     bus_iso_scored = iso_700_bus.merge(bus_analysis, on='stop_id', how='left')
 
-    # 6) 철도 Significance
+    # 6) Railway Significance
     rail_analysis = (
         railstops_gdf[['stop_id', 'route_type']]
         .merge(factor_e_rail[['stop_id','routes','factor_e']], on='stop_id', how='left')
@@ -134,37 +134,37 @@ def score_e(routes):
 
 # Bus_Factor_S: Number of Routes connected to Rail Station
 def bus_score_s(route_set, near_rail_df):
-    # rail 도보 100m 이내 정류장의 route set 중, 3000m 반경내 bus정류장 각각의 route_set과 겹치는 것이 몇 개인지 확인
+    # Among the route sets of rail stops located within a 100 m walking distance, check how many routes overlap with the route sets of each bus stop located within a 3 km radius.
     nearby_routes = set().union(*near_rail_df['routes_set'])
     matched = route_set & nearby_routes
     return 1 + 0.5 * min(len(matched), 2)
 
 def bus_compute_factor_s(busstops, busstops_all, railstops, isos_100_rail, target_crs):
-    # 0) CRS 통일
+    # 0) Match CRS
     B = busstops.to_crs(target_crs).copy()
     B_all = busstops_all.to_crs(target_crs).copy()
     R = railstops.to_crs(target_crs).copy()
     ISO = isos_100_rail.to_crs(target_crs).copy()
 
-    # 1) 각 버스정류장 3km 버퍼
+    # 1) Compute 3km buffer around each bus stop
     Bbuf = B[['stop_id', 'geometry']].copy()
     Bbuf['geometry'] = Bbuf.geometry.buffer(3000)
 
-    # 2) 버퍼 안에 들어오는 철도정류장 매칭 (각 버스정류장 → 인접 철도정류장 목록)
+    # 2) Match rail stops within 3km of bus stops
     rail_in_3km = gpd.sjoin(
         R[['stop_id', 'geometry']], Bbuf,
         how='inner', predicate='within',
         lsuffix='rail', rsuffix='bus'
     ).drop(columns=['index_right'], errors='ignore')
 
-    # 버스정류장에 연결된 인접 철도정류장 딕셔너리
+    # Dictionary: bus stop ID -> list of rail stop IDs within 3km
     bus_to_rails = (
         rail_in_3km.groupby('stop_id_bus')['stop_id_rail']
         .apply(list).to_dict()
         if len(rail_in_3km) > 0 else {}
     )
 
-    # 3) 철도 100m 이소크론 내부에 위치한 "버스정류장-철도정류장" 매칭
+    # Match rail stops within 100m isochrone
     near_bus = gpd.sjoin(
         B_all[['stop_id','routes','geometry']], ISO[['stop_id','geometry']],
         how='inner', predicate='within', lsuffix='bus', rsuffix='rail'
@@ -182,7 +182,7 @@ def bus_compute_factor_s(busstops, busstops_all, railstops, isos_100_rail, targe
         if len(near_bus) > 0 else {}
     )
 
-    # 4) 점수 계산
+    # Compute factor_s for each bus stop
     def score_row(row):
         my_routes = norm_set(row['routes'])
         rails = bus_to_rails.get(row['stop_id'], [])
@@ -196,7 +196,7 @@ def bus_compute_factor_s(busstops, busstops_all, railstops, isos_100_rail, targe
     out['factor_s'] = out.apply(score_row, axis=1)
     return out[['stop_id','factor_s']]
 
-# 2-2. Railway_Factor_S: Number of Bus Stops nearby Rail Station
+# Railway_Factor_S: Number of Bus Stops nearby Rail Station
 def rail_compute_factor_s(stops_gdf: gpd.GeoDataFrame,
                           rail_100_iso: gpd.GeoDataFrame) -> pd.DataFrame:
     
@@ -240,7 +240,7 @@ def rail_compute_factor_s(stops_gdf: gpd.GeoDataFrame,
 ##--------------------------------------------------------------------------
 
 
-# 3-1. Factor_F: Frequency (Bus와 Rail둘다 사용가능하도록 변경중)
+# Factor_F: Frequency
 def score_f(w: float) -> float:
     if w < 2.0:    return 1.00
     if w < 3.0:    return 1.25
@@ -255,39 +255,38 @@ def compute_factor_f(sched: pd.DataFrame) -> pd.DataFrame:
     sched['arr_td'] = pd.to_timedelta(sched['arrival_time'])
     sched['dep_td'] = pd.to_timedelta(sched['departure_time'])
 
-    #피크시간: 아침6시~9시, 저녁4시~7시
+    #Peak hours: 7-9am, 4-7pm
     morning_start, morning_end = 6 * 3600, 9 * 3600
     evening_start, evening_end = 16 * 3600, 19 * 3600
-    fixed_duration_h = 6.0 #오전,오후 3시간씩 합산
+    fixed_duration_h = 6.0
 
     for day in weekdays:
-        # (0) 해당 요일 운행만 필터
+        # Filter by day
         col = sched[day]
 
-        # (0+) 열이 전부 같은 값(0 또는 1)이라면 → 요일 정보가 의미 없다고 보고
-        # 필터링하지 않고 전체 레코드 사용 >> ####zip파일 하나마다 다 해줘야하나 싶음
-        if col.dropna().nunique() <= 1:   # 모두 0 or 모두 1
+        # If column of (0+) is missing or invalid (all 0 or 1), use all records
+        if col.dropna().nunique() <= 1:
             df_day = sched.copy()
 
-        # (1) 만약 유효하다면, 운행하는 요일 정보만 남기기
+        # If valid column, use only active records
         else:
             df_day = sched[col == 1].copy()
         
-        # (2) 완전 중복 이벤트 제거
+        # Remove duplicates
         df_day = df_day.drop_duplicates(subset=['stop_id','route_id','arr_td','dep_td'])
         
-        #(3) 피크시간 필터링
-        df_day = df_day.dropna(subset=['arr_td']) #도착 시각이 비어있는(stop 이벤트가 없는) 레코드를 제거
-        secs = df_day['arr_td'].dt.total_seconds().astype(int) #초 단위 float로 변환; 예: "07:10:00" → 25800초 (= 7×3600 + 10×60)
+        # Filter out records with missing arrival times
+        df_day = df_day.dropna(subset=['arr_td'])
+        secs = df_day['arr_td'].dt.total_seconds().astype(int)
         is_peak = (
             secs.between(morning_start, morning_end, inclusive='left') |
-            secs.between(evening_start, evening_end, inclusive='left') #inclusive: ≤(left) time <; both, right, neither로 조절 가능
+            secs.between(evening_start, evening_end, inclusive='left')
         )
-        df_peak = df_day[is_peak] #df_day 중 피크 시간대에 도착하는 이벤트만 남김
+        df_peak = df_day[is_peak]
 
-        # (4) 그룹핑: 피크 내 도착 횟수만 집계
+        # Group by stop_id, route_id, service_id (and direction_id if exists)
         group_cols = ['stop_id', 'route_id', 'service_id']
-        if 'direction_id' in df_peak.columns: #간혹 direction_id가 없는 경우가 있음 e.g.Hong Kong
+        if 'direction_id' in df_peak.columns:
             group_cols.insert(2, 'direction_id')
 
         span = (
@@ -296,7 +295,7 @@ def compute_factor_f(sched: pd.DataFrame) -> pd.DataFrame:
             .reset_index(name='count_peak')
         )
 
-        # (5) 각노선별: 6시간으로 나누어 시간당 운행 횟수 계산
+        # Calculate rate_h
         span['duration_h'] = fixed_duration_h
         span['rate_h'] = span['count_peak'] / span['duration_h']
 
@@ -306,14 +305,14 @@ def compute_factor_f(sched: pd.DataFrame) -> pd.DataFrame:
         )
         daily_rates.append(rate)
 
-    # (6) 5개 요일 결과 outer 병합
+    # Merge daily rates
     from functools import reduce
     rates_merged = reduce(
         lambda left, right: left.merge(right, on=['stop_id','route_id'], how='outer'),
         daily_rates
     )
 
-    # (7) 요일별 모든 노선에 대해 평균내기
+    # Average weekday rate
     rate_cols = [f'rate_{d}' for d in weekdays]
     rates_merged['avg_weekday_rate'] = rates_merged[rate_cols].mean(axis=1).fillna(0)
     

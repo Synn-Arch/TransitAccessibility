@@ -109,19 +109,19 @@ def stops_bymodes(sched_merged, stops_merged):
         .reset_index()
     )
 
-    # stop_id와 station_type을 조합한 새 인식자 생성 (후에 지울수도 있음)
+    # Create a unique identifier for each stop-mode combination
     station_modes['stop_id_mode'] = station_modes['stop_id'].astype(str) + "_" + station_modes['station_type']
 
-    # 필요시 Geo정보와 merge (optional)
+    # Merge with stops to get Geo information
     stops_sel = stops_merged.drop(
         ['stop_code', 'stop_desc', 'zone_id', 'stop_url', 'location_type', 'parent_station', 'stop_timezone', 'wheelchair_boarding'],
         axis=1, errors='ignore'
     )
 
-    # (4) Geo정보 병합 — 원래 stop_id 기준 (같은 id면 여러 교통수단 지나더라도 정류장 위치는 같게 될수도 있음)
+    # Merge to get full stop information
     station_modes_full = station_modes.merge(stops_sel, on='stop_id', how='left')
 
-    # (5) GeoDataFrame 생성
+    # Create GeoDataFrame
     station_modes_gdf = gpd.GeoDataFrame(
         station_modes_full,
         geometry=[Point(xy) for xy in zip(station_modes_full['stop_lon'], station_modes_full['stop_lat'])],
