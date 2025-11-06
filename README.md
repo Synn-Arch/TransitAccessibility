@@ -69,6 +69,16 @@ data/
 └─ LINE_EPSG4326.geojson  # Study area road network (EPSG:4326)
 ```
 
+### Notes
+* **GTFS**: Place one or more `.zip` feeds inside `data/gtfs/`.
+  The pipeline automatically merges and cleans them.
+* **`LINE_EPSG4326.geojson`**: A GeoJSON of road segments extracted from the `step1_loader` stage.
+  Must be in **EPSG:4326** (WGS84).
+* **`amenities`**: Contains precomputed amenity scores (`all_scores.json`).
+  This will be integrated with a future pipeline step for automated amenity extraction.
+  If no amenity information is available, leave this directory empty. The pipeline will still compute without the amenity scores.
+
+
 ---
 
 ### What is GTFS?
@@ -95,14 +105,6 @@ Each GTFS feed provides complete schedule data for one or more transit providers
 * You can also browse and download GTFS feeds from the **Mobility Database**:
   🔗 [https://mobilitydatabase.org/](https://mobilitydatabase.org/)
 
-
-### Notes
-* **GTFS**: Place one or more `.zip` feeds inside `data/gtfs/`.
-  The pipeline automatically merges and cleans them.
-* **`LINE_EPSG4326.geojson`**: A GeoJSON of road segments extracted from the `step1_loader` stage.
-  Must be in **EPSG:4326** (WGS84).
-* **`amenities`**: Contains precomputed amenity scores (`all_scores.json`).
-  This will be integrated with a future pipeline step for automated amenity extraction.
 
 ---
 

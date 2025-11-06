@@ -4,8 +4,7 @@ from pyproj import CRS
 from shapely.geometry import box
 
 from gtfs_pipeline.processor import concat_dataframes
-from gtfs_pipeline.network import download_walknetwork, compute_isochrones1, compute_isochrones
-from gtfs_pipeline.interpolation import interpolate_roads
+from gtfs_pipeline.network import download_walknetwork, compute_isochrones
 from gtfs_pipeline.analysis import stop_significance
 from gtfs_pipeline.results import combine_scores, persist_and_plot
 
@@ -20,8 +19,8 @@ def main():
 
     # Study Area
     # LINE_EPSG4326.geojson - GeoJSON of road segments extracted from the ./../../step1_loader step.
-    network_gdf = gpd.read_file("data/LINE_EPSG4326.geojson")
-    network_gdf = network_gdf.iloc[:5]
+    network_gdf = gpd.read_file("data/map_v3.0_centerline.geojson")
+    #network_gdf = network_gdf.iloc[:10]
     print("Study Area Load")
 
     # Check Existence of Bus or Subway
@@ -43,21 +42,31 @@ def main():
     target_crs = CRS.from_epsg(epsg)
     streets = streets.to_crs(target_crs)
 
-    # Download Walking Network & Compute Isochrones
-    points_gdf = interpolate_roads(streets, target_crs)
-    streets_buffer = streets.buffer(700).union_all()
-    walk_network = download_walknetwork(streets_buffer, crs=streets.crs)
-    iso_700_road = compute_isochrones1(points_gdf, walk_network)
+    # Compute midpoints of each street segment
+    streets['midpoint'] = streets.geometry.interpolate(streets.geometry.length / 2)
+    points_gdf = gpd.GeoDataFrame(streets.drop(columns='geometry'), 
+                                geometry=streets['midpoint'], 
+                                crs=target_crs)
+    
+    # Compute buffer around midpoints
+    buffer_geom = points_gdf.buffer(750).union_all()
+    streets_buffer = gpd.GeoDataFrame(
+        geometry=[buffer_geom],
+        crs=points_gdf.crs
+    ).to_crs(epsg=4326)
     print(f"Data is ready")
+    
+    # Filter stops within the buffer
+    stops_within_iso = gpd.sjoin(stops_bymode, streets_buffer, how="inner", predicate='intersects')
+    stops_within_iso = stops_within_iso.drop_duplicates(subset=['stop_id']).reset_index(drop=True)
 
-    iso_by_link = iso_700_road.dissolve(by="link_id", as_index=False)
-    stops_within_iso = gpd.sjoin(stops_bymode, iso_by_link, how="inner", predicate='intersects')
+    # Download Walkable Network and Compute Isochrones
+    walk_network = download_walknetwork(streets_buffer)
     isos_700_rail, isos_700_bus, isos_100_rail = compute_isochrones(stops_within_iso, walk_network)
 
-
-    # 8) Bus Stops Significance Calculation
+    # Bus Stops Significance, Rail Stations Significance Calculation
     bus_iso_scored, rail_iso_scored = stop_significance(stops_within_iso, stops_bymode, isos_100_rail, isos_700_bus, isos_700_rail, sched_merged, target_crs, tag) if has_bus else None
-    print("Step 8: Significance + Isochrone Complete")
+    print("Computing Significance is Completed")
     
     # 9) Scoring, Plot
     minx, miny, maxx, maxy = stops_bymode.total_bounds
@@ -70,7 +79,7 @@ def main():
             streets,
             bbox_gdf,
         )
-        print("Step 11: Scoring Each Street Complete ('Score' Column) + Geometry is allocated")
+        print("Scoring Each Street Complete ('Score' Column) + Geometry is allocated")
     except ValueError as e:
         print(f"❌ Scoring failed: {e}")
         return
@@ -79,7 +88,7 @@ def main():
         place_geometry=bbox_gdf,
         bus_rail_score=bus_rail_score,
     )
-    print("Step 12: Maps are prepared, and saved")
+    print("Maps are prepared, and saved in the output folder.")
 
 final_score = main()
 

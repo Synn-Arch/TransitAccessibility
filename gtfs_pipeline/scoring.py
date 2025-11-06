@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 
 def scoring(points, iso, streets):
+    #print("Debug: Check CRS: ", "iso:", iso.crs, "point:",points.crs, streets.crs)
     joined_gdf = gpd.sjoin(points, iso, how="left", predicate="intersects")
 
     # Convert index to column for grouping

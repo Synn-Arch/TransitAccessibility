@@ -35,9 +35,8 @@ def download_drivenetwork(place):
 
     return gdf_edges
 
-def download_walknetwork(buffer, crs):
-    boundary_wgs = gpd.GeoSeries([buffer], crs=crs).to_crs(4326)
-    minx, miny, maxx, maxy = boundary_wgs.total_bounds
+def download_walknetwork(buffer):
+    minx, miny, maxx, maxy = buffer.total_bounds
     bbox = (minx, miny, maxx, maxy)
     G_Walk = ox.graph.graph_from_bbox(bbox, network_type='walk')
     return G_Walk

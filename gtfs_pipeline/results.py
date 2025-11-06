@@ -18,27 +18,13 @@ def combine_scores(
     points = interpolate_roads(streets, target_crs=streets.crs)
     streets_gdf = streets.to_crs(bus_result_iso.crs)
 
-    has_bus = bus_result_iso is not None
-    has_rail = rail_result_iso is not None
-
     bus_score  = scoring(points, bus_result_iso, streets_gdf) \
         if (bus_result_iso is not None and not bus_result_iso.empty) else None
     rail_score = scoring(points, rail_result_iso, streets_gdf) \
         if (rail_result_iso is not None and not rail_result_iso.empty) else None
 
-    if has_bus and has_rail:
-        all_result_iso = pd.concat([bus_result_iso, rail_result_iso], ignore_index=True)
-    elif has_bus:
-        all_result_iso = bus_result_iso
-    elif has_rail:
-        all_result_iso = rail_result_iso
-    else:
-        raise ValueError("Scoring cannot be combined: both bus_result_iso and rail_result_iso are None or empty.")
-
-    concat_score = scoring(points, all_result_iso, streets)
-
     # Aggregate bus and rail scores
-    bus_rail_score = (bus_score.copy() if bus_score is not None else concat_score.copy())
+    bus_rail_score = bus_score.copy()
     bus_rail_score['Score_Bus'] = bus_score['Score'] if bus_score is not None else 0
     bus_rail_score['Score_Rail'] = rail_score['Score'] if rail_score is not None else 0
     bus_rail_score['Score'] = bus_rail_score['Score_Bus'] + bus_rail_score['Score_Rail']

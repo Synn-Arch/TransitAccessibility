@@ -2,6 +2,7 @@ import pandas as pd
 import geopandas as gpd
 import json
 from shapely.geometry import Point
+import os
 
 
 def stop_significance(
@@ -54,8 +55,8 @@ def stop_significance(
         .copy()
     )
 
-    factor_f_bus  = compute_factor_f(sched_bus)
-    factor_f_rail = compute_factor_f(sched_rail)
+    factor_f_bus  = compute_factor_f(sched_bus,  all_stop_ids=busstops_gdf['stop_id'])
+    factor_f_rail = compute_factor_f(sched_rail, all_stop_ids=railstops_gdf['stop_id'])
 
     # 4) Factor Q
     bus_factor_q = compute_factor_q(
@@ -63,7 +64,8 @@ def stop_significance(
         tag=tag,
         target_crs=target_crs
     )
-    rail_factor_q_scalar = 2.5
+    json_path = 'data/amenities/all_scores.json'
+    rail_factor_q_scalar = 2.5 if os.path.exists(json_path) else 0.5
 
     # 5) Bus Stop Significance
     bus_analysis = (
@@ -248,35 +250,28 @@ def score_f(w: float) -> float:
     if w <= 6.0:   return 1.75
     return 2.00
 
-def compute_factor_f(sched: pd.DataFrame) -> pd.DataFrame:
+def compute_factor_f(sched: pd.DataFrame, all_stop_ids=None) -> pd.DataFrame:
     weekdays = ['monday','tuesday','wednesday','thursday','friday']
     daily_rates = []
     sched = sched.copy()
     sched['arr_td'] = pd.to_timedelta(sched['arrival_time'])
     sched['dep_td'] = pd.to_timedelta(sched['departure_time'])
 
-    #Peak hours: 7-9am, 4-7pm
+    # Peak hours: 7–9am, 4–7pm
     morning_start, morning_end = 6 * 3600, 9 * 3600
     evening_start, evening_end = 16 * 3600, 19 * 3600
     fixed_duration_h = 6.0
 
     for day in weekdays:
-        # Filter by day
-        col = sched[day]
-
-        # If column of (0+) is missing or invalid (all 0 or 1), use all records
-        if col.dropna().nunique() <= 1:
+        col = sched.get(day)
+        if col is None or col.dropna().nunique() <= 1:
             df_day = sched.copy()
-
-        # If valid column, use only active records
         else:
             df_day = sched[col == 1].copy()
-        
-        # Remove duplicates
+
         df_day = df_day.drop_duplicates(subset=['stop_id','route_id','arr_td','dep_td'])
-        
-        # Filter out records with missing arrival times
         df_day = df_day.dropna(subset=['arr_td'])
+
         secs = df_day['arr_td'].dt.total_seconds().astype(int)
         is_peak = (
             secs.between(morning_start, morning_end, inclusive='left') |
@@ -284,42 +279,42 @@ def compute_factor_f(sched: pd.DataFrame) -> pd.DataFrame:
         )
         df_peak = df_day[is_peak]
 
-        # Group by stop_id, route_id, service_id (and direction_id if exists)
         group_cols = ['stop_id', 'route_id', 'service_id']
         if 'direction_id' in df_peak.columns:
             group_cols.insert(2, 'direction_id')
 
-        span = (
-            df_peak.groupby(group_cols)
-            .size()
-            .reset_index(name='count_peak')
-        )
+        span = (df_peak.groupby(group_cols)
+                      .size()
+                      .reset_index(name='count_peak'))
 
-        # Calculate rate_h
         span['duration_h'] = fixed_duration_h
         span['rate_h'] = span['count_peak'] / span['duration_h']
 
-        rate = (
-            span.groupby(['stop_id','route_id'])['rate_h']
-            .mean().reset_index(name=f'rate_{day}')
-        )
+        rate = (span.groupby(['stop_id','route_id'])['rate_h']
+                    .mean().reset_index(name=f'rate_{day}'))
         daily_rates.append(rate)
 
-    # Merge daily rates
     from functools import reduce
-    rates_merged = reduce(
-        lambda left, right: left.merge(right, on=['stop_id','route_id'], how='outer'),
-        daily_rates
-    )
+    rates_merged = (reduce(lambda L, R: L.merge(R, on=['stop_id','route_id'], how='outer'),
+                           daily_rates)
+                    if daily_rates else pd.DataFrame(columns=['stop_id','route_id']))
 
-    # Average weekday rate
-    rate_cols = [f'rate_{d}' for d in weekdays]
-    rates_merged['avg_weekday_rate'] = rates_merged[rate_cols].mean(axis=1).fillna(0)
-    
-    factor_f_df = (
-        rates_merged.groupby('stop_id')['avg_weekday_rate']
-        .mean().reset_index(name='stop_rate_h')
-    )
+    rate_cols = [f'rate_{d}' for d in weekdays if f'rate_{d}' in rates_merged.columns]
+    if not rate_cols:
+        factor_f_df = rates_merged[['stop_id']].drop_duplicates()
+        factor_f_df['stop_rate_h'] = 0.0
+    else:
+        rates_merged['avg_weekday_rate'] = rates_merged[rate_cols].mean(axis=1).fillna(0)
+        factor_f_df = (rates_merged.groupby('stop_id')['avg_weekday_rate']
+                                  .mean().reset_index(name='stop_rate_h'))
+
+    if all_stop_ids is None:
+        all_stop_ids = pd.Index(sched['stop_id'].unique())
+
+    universe = pd.DataFrame({'stop_id': all_stop_ids})
+    factor_f_df = universe.merge(factor_f_df, on='stop_id', how='left')
+
+    factor_f_df['stop_rate_h'] = factor_f_df['stop_rate_h'].fillna(0.0)
     factor_f_df['factor_f'] = factor_f_df['stop_rate_h'].apply(score_f)
     return factor_f_df
 
@@ -331,8 +326,14 @@ def compute_factor_q(
     busstops_gdf: gpd.GeoDataFrame,
     tag: str,
     target_crs: str) -> pd.DataFrame:
-    with open('data/amenities/all_scores.json') as f:
-        data = json.load(f)
+    try:
+        with open('data/amenities/all_scores.json') as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return pd.DataFrame({
+            'stop_id': pd.Index(busstops_gdf['stop_id'].astype(str)).unique(),
+            'factor_q': 0.0
+        })
         
     qualityScore = (
         pd.DataFrame.from_dict(data, orient='index')
