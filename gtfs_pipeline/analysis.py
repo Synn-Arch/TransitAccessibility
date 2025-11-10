@@ -369,7 +369,7 @@ def compute_factor_q(
         how="left"
     )
 
-    cols = ['shelter','seating','trash can','route info','schedule','sign']
+    cols = ['shelter','seating','trash can','sign']
     zero_dict = dict.fromkeys(cols, 0)
     mapping = {
         # signs
@@ -414,14 +414,12 @@ def compute_factor_q(
         amenities_count = (
             data['trash can'] +
             data['seating'] +
-            data['schedule'] +
-            data['route info'] +
             data['sign']
         )
 
         if amenities_count <= 1:
             amenities_index = 1.0
-        elif amenities_count <= 3:
+        elif amenities_count == 2:
             amenities_index = 1.5
         else:
             amenities_index = 2.0
