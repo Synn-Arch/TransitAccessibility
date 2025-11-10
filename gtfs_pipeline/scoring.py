@@ -8,7 +8,6 @@ def scoring(points, iso, streets):
 
     # Convert index to column for grouping
     joined_gdf = joined_gdf.reset_index()
-    #print(f"Debug Check: \n{joined_gdf}")
 
     # Summarize significance per point
     collapsed_gdf = joined_gdf.groupby("index", as_index=False).agg({
@@ -42,8 +41,9 @@ def scoring(points, iso, streets):
 
     # Final Score Calculation
     scoredStreet['Score'] = scoredStreet['sig_mean_mean']*(np.log((scoredStreet['stops_computecount']/scoredStreet['points_count'])+1))
-
+    
     # Convert to GeoDataFrame and merge geometry
+    streets = streets.drop(columns=['midpoint', 'points'], errors='ignore')
     scoredStreet = scoredStreet.merge(
         streets[['name', 'link_id', 'geometry']],
         on=['link_id'],

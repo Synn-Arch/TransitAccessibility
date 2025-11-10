@@ -19,8 +19,7 @@ def main():
 
     # Study Area
     # LINE_EPSG4326.geojson - GeoJSON of road segments extracted from the ./../../step1_loader step.
-    network_gdf = gpd.read_file("data/map_v3.0_centerline.geojson")
-    #network_gdf = network_gdf.iloc[:10]
+    roads_gdf = gpd.read_file("data/map_v3.0_centerline.geojson")
     print("Study Area Load")
 
     # Check Existence of Bus or Subway
@@ -34,7 +33,7 @@ def main():
         print("⚠️ No rail stops found in this city.")
     print(f"{len(stops_bymode)} Stops will be processed")
 
-    streets = network_gdf.copy()
+    streets = roads_gdf.copy()
     first_geom = streets.geometry.iloc[0]
     lon, lat = first_geom.coords[0]
     zone = int((lon + 180) // 6) + 1
@@ -73,11 +72,10 @@ def main():
     bbox_geom = box(minx, miny, maxx, maxy)
     bbox_gdf = gpd.GeoDataFrame(geometry=[bbox_geom], crs=stops_bymode.crs)
     try:
-        bus_rail_score = combine_scores(
+        bus_rail_attributes, bus_rail_score = combine_scores(
             bus_iso_scored,
             rail_iso_scored,
-            streets,
-            bbox_gdf,
+            streets
         )
         print("Scoring Each Street Complete ('Score' Column) + Geometry is allocated")
     except ValueError as e:
@@ -86,7 +84,8 @@ def main():
 
     persist_and_plot(
         place_geometry=bbox_gdf,
-        bus_rail_score=bus_rail_score,
+        bus_rail_attributes=bus_rail_attributes,
+        bus_rail_score = bus_rail_score
     )
     print("Maps are prepared, and saved in the output folder.")
 

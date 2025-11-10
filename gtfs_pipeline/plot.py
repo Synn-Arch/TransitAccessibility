@@ -4,7 +4,7 @@ import webbrowser
 import os
 import geopandas as gpd
 
-def plot(score_gdf, place, score_column="Score", filename="score_map.html"):
+def plot(score_gdf, place, score_column="Transit_attribute", filename="Transit_Attributes_Map.html"):
     score_gdf = score_gdf.copy()
 
     # Compute center of the place geometry for map centering

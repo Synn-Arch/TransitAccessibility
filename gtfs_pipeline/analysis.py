@@ -117,9 +117,9 @@ def stop_significance(
     return bus_iso_scored, rail_iso_scored
 
 ##--------------------------------------------------------------------------
+## Factor_E: Number of Routes
 ##--------------------------------------------------------------------------
 
-# 1-1. Factor_E: Number of Routes
 def compute_factor_e(stops: gpd.GeoDataFrame) -> pd.DataFrame:
     factor_e_df = stops[['stop_id', 'routes']].copy()
     factor_e_df['factor_e'] = factor_e_df['routes'].apply(score_e)
@@ -131,10 +131,9 @@ def score_e(routes):
 
 
 ##--------------------------------------------------------------------------
+# Bus_Factor_S: Number of Routes connected to Rail Station
 ##--------------------------------------------------------------------------
 
-
-# Bus_Factor_S: Number of Routes connected to Rail Station
 def bus_score_s(route_set, near_rail_df):
     # Among the route sets of rail stops located within a 100 m walking distance, check how many routes overlap with the route sets of each bus stop located within a 3 km radius.
     nearby_routes = set().union(*near_rail_df['routes_set'])
@@ -198,7 +197,9 @@ def bus_compute_factor_s(busstops, busstops_all, railstops, isos_100_rail, targe
     out['factor_s'] = out.apply(score_row, axis=1)
     return out[['stop_id','factor_s']]
 
-# Railway_Factor_S: Number of Bus Stops nearby Rail Station
+##--------------------------------------------------------------------------
+## Railway_Factor_S: Number of Bus Stops nearby Rail Station
+##--------------------------------------------------------------------------
 def rail_compute_factor_s(stops_gdf: gpd.GeoDataFrame,
                           rail_100_iso: gpd.GeoDataFrame) -> pd.DataFrame:
     
@@ -239,10 +240,9 @@ def rail_compute_factor_s(stops_gdf: gpd.GeoDataFrame,
     return result[['stop_id', 'factor_s']]
 
 ##--------------------------------------------------------------------------
+## Factor_F: Frequency
 ##--------------------------------------------------------------------------
 
-
-# Factor_F: Frequency
 def score_f(w: float) -> float:
     if w < 2.0:    return 1.00
     if w < 3.0:    return 1.25
@@ -319,9 +319,9 @@ def compute_factor_f(sched: pd.DataFrame, all_stop_ids=None) -> pd.DataFrame:
     return factor_f_df
 
 ##--------------------------------------------------------------------------
+## 4. Bus Stops Facilities Score
 ##--------------------------------------------------------------------------
 
-# 4. Bus Stops Facilities Score
 def compute_factor_q(
     busstops_gdf: gpd.GeoDataFrame,
     tag: str,
