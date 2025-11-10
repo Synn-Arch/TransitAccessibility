@@ -145,14 +145,14 @@ python -m scripts.run_pipeline
 
 ## 5️⃣ Criteria — Final Score Computation (Step-by-Step)
 
-## 1) Selecting Stops in Study Area
+### 1) Selecting Stops in Study Area
 
 * In `run_pipeline.py`, the road centerlines are converted to midpoints and buffered by **750 m** to define the **study boundary**.
 * Only **bus and rail stops** that intersect this buffer are selected for analysis.
 
 ---
 
-## 2) Isochrone (Walkable Catchment) Generation
+### 2) Isochrone (Walkable Catchment) Generation
 
 * `network.py`
 
@@ -164,7 +164,7 @@ python -m scripts.run_pipeline
 
 ---
 
-## 3) Stop Significance Calculation
+### 3) Stop Significance Calculation
 
 * `analysis.py` computes **four factors (E, S, F, Q)** per stop, then combines them as:
 
@@ -172,7 +172,7 @@ python -m scripts.run_pipeline
 significance = E × S × F + Q
 ```
 
-### 3.1 Factor E — Route Diversity
+#### 3.1 Factor E — Route Diversity
 
 Represents the number of distinct routes serving a stop:
 
@@ -180,7 +180,7 @@ Represents the number of distinct routes serving a stop:
 factor_e = 0.5 + 0.5 * min(E, 3)
 ```
 
-### 3.2 Factor S — Connectivity
+#### 3.2 Factor S — Connectivity
 
 * **Bus stops:** Measures how many nearby rail routes overlap within 3 km.
 
@@ -196,7 +196,7 @@ where *k* = number of matching routes within nearby rail stops.
 factor_s_rail = 1 + 0.5 * min(S_r, 2)
 ```
 
-### 3.3 Factor F — Service Frequency
+#### 3.3 Factor F — Service Frequency
 
 * Days: Monday–Friday
 * Peak hours: 07–09 a.m., 16–19 p.m. (6 h total)
@@ -210,7 +210,7 @@ factor_s_rail = 1 + 0.5 * min(S_r, 2)
 > 6 → 2.00
 ```
 
-### 3.4 Factor Q — Stop Facilities
+#### 3.4 Factor Q — Stop Facilities
 
 * **Bus:** Computed from `amenities/all_scores.json` and `Inventory.csv` using presence of
   *shelter, seating, trash can, route info, schedule, sign*:
@@ -230,7 +230,7 @@ If no amenity data → `factor_q_bus = 0`.
 0.5 (if missing)
 ```
 
-### 3.5 Combined Stop Significance
+#### 3.5 Combined Stop Significance
 
 ```
 significance_bus  = E × S_bus × F + Q_bus
@@ -241,7 +241,7 @@ These values are joined to the 700 m isochrone polygons.
 
 ---
 
-## 4) Interpolating Road Points
+### 4) Interpolating Road Points
 
 * `interpolation.py`
 
@@ -249,7 +249,7 @@ These values are joined to the 700 m isochrone polygons.
 
 ---
 
-## 5) Point-Level Aggregation
+### 5) Point-Level Aggregation
 
 * `scoring.py`
 
@@ -264,7 +264,7 @@ sig_mean_per_point = (sig_sum_per_point / stops_count) if stops_count>0 else 0
 
 ---
 
-## 6) Street-Level Scoring
+### 6) Street-Level Scoring
 
 * Points are grouped by `link_id` to compute:
 
@@ -281,7 +281,7 @@ Score = sig_mean_mean × log((stops_computecount / points_count) + 1)
 
 ---
 
-## 7) Combined and Scaled Score
+### 7) Combined and Scaled Score
 
 * `results.py`
 
@@ -299,7 +299,7 @@ Transit_score = clip(Transit_attribute, 0, 22) / 22 × 12.6
 
 ---
 
-## 8) Outputs
+### 8) Outputs
 
 * **Interactive map:**
   `data/output/Transit_Attributes_Map.html`
@@ -311,7 +311,7 @@ Transit_score = clip(Transit_attribute, 0, 22) / 22 × 12.6
 
 ---
 
-### Notes & Edge Cases
+#### Notes & Edge Cases
 
 * Points with zero intersecting stops default to score = 0.
 * All geometry processing occurs in **local UTM CRS**, with outputs converted to **EPSG:4326** for visualization.
