@@ -12,6 +12,7 @@ A **GeoJSON file** representing road segment links (EPSG:4326), along with:
 
 - One or more **GTFS`.zip` files**
 - A GeoJSON file of road segment points
+- A GeoJSON file of road segments
 - (Optional) Amenity score file (`all_scores.json`) to enrich bus stop facility scoring
 
 ## Process
