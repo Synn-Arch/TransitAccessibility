@@ -1,317 +1,307 @@
+````markdown
 ![Transit Animation](docs/img/animation.gif)
 
 # Transit Accessibility Pipeline (GTFS + OSMnx)
 
-This pipeline calculates **bus and rail accessibility scores** using **GTFS**, **OSMnx**, and **GeoPandas**, and exports the results as an interactive **Folium map** and a CSV file.
-The main entry point is:
-
-```bash
-python -m scripts.run_pipeline
-```
+## 📍 Objective
+This repository provides tools to compute **transit accessibility scores** along road network segments using **GTFS feeds** and **OSMnx pedestrian networks**.  
+It outputs both an **interactive Folium map** and structured **CSV/GeoJSON** files at the **link level**.
 
 ---
 
-## 1️⃣ Installation (Virtual Environment + Dependencies)
+## Input
 
-### Option A: Standard `venv` + pip
+A **GeoJSON file** representing road segment links (EPSG:4326), along with:
+
+- One or more **GTFS `.zip` files**
+- (Optional) Amenity score file (`all_scores.json`) to enrich bus stop facility scoring
+
+---
+
+## Process
+
+1. Load and merge **GTFS feeds** into unified stop, route, and trip tables.  
+2. Download pedestrian networks and generate **walkable isochrones** using OSMnx.  
+3. Compute **stop significance** using a multi-factor model (E/S/F/Q).  
+4. Interpolate analysis points along road links and **aggregate accessibility** via spatial joins.  
+5. Export results as **interactive HTML maps**, **CSV summaries**, and **GeoJSON layers**.
+
+---
+
+## Output
+
+- **Interactive map** (Folium)  
+- **CSV file** with link-level accessibility scores  
+- **GeoJSON files** representing combined and scaled transit accessibility attributes  
+
+---
+
+## 📦 Features
+
+- Automated GTFS ingestion and merging  
+- OSMnx-based pedestrian network & walkable catchments  
+- Multi-factor stop significance model (E, S, F, Q)  
+- Road-link interpolation and aggregated scoring  
+- Optional integration of bus-stop amenities  
+
+---
+
+## 🚀 Quick Guide
+
+### 1. Environment Setup
+
+#### Option A — `venv` + pip
 
 ```bash
-# Clone repository
-git clone <YOUR_REPO_URL> TransitAccessibility
-cd TransitAccessibility
+python -m venv .venv
+source .venv/bin/activate       # macOS/Linux
+# .venv\Scripts\Activate.ps1    # Windows
 
-# Create and activate virtual environment
-python -m venv .venv # Choose your own environment name
-# macOS/Linux
-source .venv/bin/activate
-# Windows (PowerShell)
-# .venv\Scripts\Activate.ps1
-
-# Update pip and install dependencies
 pip install -U pip
 pip install -r requirements.txt
-```
+````
 
-> ⚠️ If you encounter errors installing `geopandas`, `pyproj`, or `rtree`,
-> we recommend using **Option B (Conda)** below.
+> If installation of geospatial packages fails, use Conda instead.
 
----
-
-### Option B: Conda (Recommended)
+#### Option B — Conda (Recommended)
 
 ```bash
-# Clone repository
-git clone <YOUR_REPO_URL> TransitAccessibility
-cd TransitAccessibility
-
-# Create a clean Conda environment
 conda create -n gtfs python=3.11 -y
 conda activate gtfs
 
-# Install geospatial core packages
 conda install -c conda-forge geopandas pyproj rtree -y
-
-# Install remaining dependencies via pip
 pip install -r requirements.txt
 ```
 
 ---
 
-## 2️⃣ Data Preparation
+## 2. Prepare Input Data
 
-Before running, prepare the following folder structure inside the project root:
+Your project directory should contain:
 
 ```
 data/
-├─ gtfs/                  # GTFS .zip files (can contain multiple)
+├─ gtfs/                  # One or more GTFS .zip files
 ├─ amenities/
-│  └─ all_scores.json     # Stop-level amenity score dictionary
-├─ output/                # Output folder (auto-created if missing)
-└─ LINE_EPSG4326.geojson  # Study area road network (EPSG:4326)
+│  └─ all_scores.json     # Optional amenity score dictionary
+├─ output/                # Output folder (auto-created)
+└─ LINE_EPSG4326.geojson  # Road network (EPSG:4326)
 ```
 
-### Notes
-* **GTFS**: Place one or more `.zip` feeds inside `data/gtfs/`.
-  The pipeline automatically merges and cleans them.
-* **`LINE_EPSG4326.geojson`**: A GeoJSON of road segments extracted from the `step1_loader` stage.
-  Must be in **EPSG:4326** (WGS84).
-* **`amenities`**: Contains precomputed amenity scores (`all_scores.json`).
-  This will be integrated with a future pipeline step for automated amenity extraction.
-  **If no amenity information is available, leave this directory empty.** The pipeline will still compute without the amenity scores.
+1. Add the road network file:
+   `data/LINE_EPSG4326.geojson`
+2. Place one or more GTFS ZIP files in:
+   `data/gtfs/`
+3. (Optional) Add amenity data in:
+   `data/amenities/all_scores.json`
 
-### What is GTFS?
-
-**GTFS (General Transit Feed Specification)** is a standardized data format that describes public transportation schedules, stops, routes, and related information.
-It was originally developed by Google and Portland’s TriMet to enable transit data integration into Google Maps, and is now widely used by transit agencies around the world.
-
-Each GTFS feed provides complete schedule data for one or more transit providers in a city.
-
-#### 📥 How to get GTFS data
-
-* Most cities or transportation agencies publish their GTFS data publicly.
-  Try searching on Google for your city name along with “**GTFS**”.
-  For example:
-
-  ```
-  "Seoul GTFS"
-  "New York City GTFS"
-  "London GTFS"
-  ```
-
-  This usually leads to an official open-data portal or a public transport API.
-
-* You can also browse and download GTFS feeds from the **Mobility Database**:
-  🔗 [https://mobilitydatabase.org/](https://mobilitydatabase.org/)
-
+If no amenity data is provided, the pipeline still executes normally.
 
 ---
 
-## 3️⃣ Running the Pipeline
+### 2-1. What Is GTFS & How to Get It
 
-Run the pipeline directly from the project root:
+GTFS describes public transit stops, routes, trips, calendars, and schedules.
+
+Sources for GTFS feeds:
+
+* Search online: `"Seoul GTFS"`, `"NYC GTFS"`, `"London GTFS"`
+* Mobility Database:
+  [https://mobilitydatabase.org/](https://mobilitydatabase.org/)
+
+Download `.zip` files and place them in `data/gtfs/`.
+
+---
+
+## 3. Run the Pipeline
+
+From the project root:
 
 ```bash
 python -m scripts.run_pipeline
 ```
 
----
-
-### Execution Flow Overview
-
-1. **Load and process GTFS ZIP files**
-   → merges `stops.txt`, `trips.txt`, `routes.txt`, and others into unified dataframes.
-2. **Load road network GeoJSON** and convert CRS to the appropriate **local UTM**.
-3. **Download pedestrian network** from OSMnx and compute **isochrones** (700m radius, 100m for rail).
-4. **Compute stop significance** using the E/S/F/Q scoring model.
-5. **Interpolate points along streets** and aggregate scores per link (`scoring.py`).
-6. **Save results:**
-   * `data/output/bus_rail_score.html` — interactive map
-   * `data/output/bus_rail_score.csv` — link-level accessibility scores
+All results will be written into the `data/output/` directory.
 
 ---
 
-## 4️⃣ Outputs
+## ⚙️ Process (High-Level)
 
-* **Interactive map:**
-  `data/output/bus_rail_score.html`
-* **Score table (CSV):**
-  `data/output/bus_rail_score.csv`
-  Columns typically include:
+1. Load GTFS feeds and unify stops/trips/routes.
+2. Define a **study boundary** with a 750 m buffer around road link midpoints.
+3. Select bus and rail stops intersecting the study boundary.
+4. Build **OSMnx pedestrian networks** and generate walkable catchments:
 
-  * `link_id`, `Score`, `Score_Bus`, `Score_Rail`, `geometry`, etc.
+   * 700 m for all modes
+   * 100 m for rail (for bus–rail connectivity)
+5. Compute stop significance using:
 
-
----
-
-## 5️⃣ Criteria — Final Score Computation (Step-by-Step)
-
-### 1) Selecting Stops in Study Area
-
-* In `run_pipeline.py`, the road centerlines are converted to midpoints and buffered by **750 m** to define the **study boundary**.
-* Only **bus and rail stops** that intersect this buffer are selected for analysis.
-
----
-
-### 2) Isochrone (Walkable Catchment) Generation
-
-* `network.py`
-
-  * Downloads a pedestrian network via **OSMnx**.
-  * For each stop, generates convex hulls of reachable nodes within:
-
-    * **700 m** — for all transit modes (`isos_700_*`)
-    * **100 m** — for rail modes (`isos_100_rail`)
+   * `E`: route diversity
+   * `S`: connectivity
+   * `F`: service frequency
+   * `Q`: amenities
+6. Interpolate road links at **10 m spacing**.
+7. Join interpolated points with stop isochrones and compute mean significance per point.
+8. Aggregate scores to each road link to produce final accessibility scores.
 
 ---
 
-### 3) Stop Significance Calculation
+# 🧠 Methodology
 
-* `analysis.py` computes **four factors (E, S, F, Q)** per stop, then combines them as:
+This section describes the full scoring framework applied in the pipeline.
+
+---
+
+## 1) Study Area Definition
+
+* Compute midpoints of road centerlines.
+* Apply a **750 m buffer** to form the analysis boundary.
+* Select all bus/rail stops intersecting the boundary.
+
+---
+
+## 2) Walkable Catchments (Isochrones)
+
+Generated in `network.py` using OSMnx:
+
+* **700 m isochrones**: all transit modes
+* **100 m isochrones**: rail modes (for multimodal connectivity)
+
+These polygons are used to identify which stops influence which locations.
+
+---
+
+## 3) Stop Significance (E/S/F/Q)
+
+Overall model:
 
 ```
 significance = E × S × F + Q
 ```
 
-#### 3.1 Factor E — Route Diversity
-
-Represents the number of distinct routes serving a stop:
+### E — Route Diversity
 
 ```
 factor_e = 0.5 + 0.5 * min(E, 3)
 ```
 
-#### 3.2 Factor S — Connectivity
+### S — Connectivity
 
-* **Bus stops:** Measures how many nearby rail routes overlap within 3 km.
+**Bus stops:**
 
 ```
 factor_s_bus = 1 + 0.5 * min(k, 2)
 ```
 
-where *k* = number of matching routes within nearby rail stops.
+`k` = number of rail routes within 3 km.
 
-* **Rail stops:** Counts bus stops within the rail stop’s 100 m isochrone.
+**Rail stops:**
 
 ```
 factor_s_rail = 1 + 0.5 * min(S_r, 2)
 ```
 
-#### 3.3 Factor F — Service Frequency
+`S_r` = number of bus stops inside a 100 m rail catchment.
 
-* Days: Monday–Friday
-* Peak hours: 07–09 a.m., 16–19 p.m. (6 h total)
-* Calculates arrivals per 6 h, averaged across days and routes → `stop_rate_h`
+### F — Service Frequency
+
+Peak hours: **07–09**, **16–19** (6 hours total)
 
 ```
-< 2 → 1.00  
-< 3 → 1.25  
-< 4 → 1.50  
-≤ 6 → 1.75  
+< 2 → 1.00
+< 3 → 1.25
+< 4 → 1.50
+≤ 6 → 1.75
 > 6 → 2.00
 ```
 
-#### 3.4 Factor Q — Stop Facilities
+### Q — Stop Facilities
 
-* **Bus:** Computed from `amenities/all_scores.json` and `Inventory.csv` using presence of
-  *shelter, seating, trash can, route info, schedule, sign*:
+**Bus:**
 
 ```
 shelter_index = 2.0 if shelter else 1.0
-amenities_index = { ≤1: 1.0, 2–3: 1.5, ≥4: 2.0 }
+amenities_index: ≤1→1.0, 2–3→1.5, ≥4→2.0
 factor_q_bus = (shelter_index × amenities_index) / 2
 ```
 
 If no amenity data → `factor_q_bus = 0`.
 
-* **Rail:** Assigned constant value:
+**Rail:**
 
 ```
-2.5 (if amenity file exists)  
+2.5 (if amenity data exists)
 0.5 (if missing)
 ```
 
-#### 3.5 Combined Stop Significance
+### Combined
 
 ```
-significance_bus  = E × S_bus × F + Q_bus
+significance_bus  = E × S_bus  × F + Q_bus
 significance_rail = E × S_rail × F + Q_rail
 ```
 
-These values are joined to the 700 m isochrone polygons.
+---
+
+## 4) Road Point Interpolation
+
+Road segments are sampled every **10 m** to form analysis points.
 
 ---
 
-### 4) Interpolating Road Points
+## 5) Point-Level Aggregation
 
-* `interpolation.py`
-
-  * Each road segment is sampled at **10 m intervals** to produce analysis points along the streets.
-
----
-
-### 5) Point-Level Aggregation
-
-* `scoring.py`
-
-  * Performs a spatial join between interpolated points and stop isochrones (intersects).
-  * For each point:
+For each interpolated point:
 
 ```
-sig_sum_per_point  = Σ (significance of overlapping stops)
+sig_sum_per_point  = Σ significance of intersecting stops
 stops_count        = number of intersecting stops
-sig_mean_per_point = (sig_sum_per_point / stops_count) if stops_count>0 else 0
+sig_mean_per_point = sig_sum_per_point / stops_count  (or 0)
 ```
 
 ---
 
-### 6) Street-Level Scoring
+## 6) Link-Level Scoring
 
-* Points are grouped by `link_id` to compute:
-
-  * `points_count` = number of points per link
-  * `stops_computecount` = total contributing stops
-  * `sig_mean_mean` = mean of `sig_mean_per_point`
-* Final **link score**:
+For each road link:
 
 ```
 Score = sig_mean_mean × log((stops_computecount / points_count) + 1)
 ```
 
-![Formula Illustration](docs/img/formula.png)
+Separate scores for bus and rail are maintained.
 
 ---
 
-### 7) Combined and Scaled Score
-
-* `results.py`
-
-  * Merge both modes:
+## 7) Combined & Scaled Score
 
 ```
 Transit_attribute = Score_Bus + Score_Rail
-```
-
-* Scale to 0–12.6 (clipped at 22):
-
-```
-Transit_score = clip(Transit_attribute, 0, 22) / 22 × 12.6
+Transit_score     = clip(Transit_attribute, 0, 22) / 22 × 12.6
 ```
 
 ---
 
-### 8) Outputs
+## 8) Final Outputs
+
+Saved under `data/output/`:
 
 * **Interactive map:**
-  `data/output/Transit_Attributes_Map.html`
-  
-* **GeoJSON exports:**
+  `Transit_Attributes_Map.html`
+* **GeoJSON:**
+  `Transit_ATTRIBUTE.geojson`
+  `Transit_SCORE.geojson`
+* **CSV:**
+  `bus_rail_score.csv`
+* **HTML:**
+  `bus_rail_score.html`
 
-  * `Transit_ATTRIBUTE.geojson` — combined attributes
-  * `Transit_SCORE.geojson` — scaled scores
+Geometries are processed in **local UTM** and exported as **EPSG:4326** for mapping.
 
 ---
 
-#### Notes & Edge Cases
+## 🧩 Notes
 
-* Points with zero intersecting stops default to score = 0.
-* All geometry processing occurs in **local UTM CRS**, with outputs converted to **EPSG:4326** for visualization.
+* Links with no intersecting stops receive a score of **0**.
+* Full functionality is preserved even without amenity data.
+* Multiple GTFS feeds are merged automatically.

@@ -5,60 +5,11 @@ from shapely.geometry import Point
 from typing import Set
 from shapely.geometry import box
 
-def download_drivenetwork(place):
-    poly = place.union_all()
-
-    desired_types = {
-        "trunk","primary","secondary","tertiary",
-        "residential","living_street","pedestrian"
-    }
-
-    G_Drive = ox.graph_from_polygon(
-        poly,
-        network_type="drive",
-        retain_all=False,
-        truncate_by_edge=True
-    )
-
-    # optional post-filter for highway classes
-    edges_to_remove = [
-        (u, v, k) for u, v, k, data in G_Drive.edges(keys=True, data=True)
-        if "highway" not in data or not any(hwy_type in data["highway"] for hwy_type in desired_types)
-    ]
-
-    G_Drive.remove_edges_from(edges_to_remove)
-    G_Drive.remove_nodes_from(list(nx.isolates(G_Drive)))
-
-    gdf_edges = ox.graph_to_gdfs(G_Drive, nodes=False)
-    gdf_edges = gdf_edges.reset_index()
-    gdf_edges = gdf_edges[['u', 'v', 'key', 'osmid', 'highway', 'name', 'length', 'geometry']]
-
-    return gdf_edges
-
 def download_walknetwork(buffer):
     minx, miny, maxx, maxy = buffer.total_bounds
     bbox = (minx, miny, maxx, maxy)
     G_Walk = ox.graph.graph_from_bbox(bbox, network_type='walk')
     return G_Walk
-
-def compute_isochrones1(points_gdf, G, radius=700):
-    records = []
-    for idx, geom in enumerate(points_gdf.geometry):
-        try:
-            center = ox.distance.nearest_nodes(G, X=geom.x, Y=geom.y)
-            subg = nx.ego_graph(G, center, radius=radius, distance="length")
-            pts = [Point(data["x"], data["y"]) for _, data in subg.nodes(data=True)]
-            hull = gpd.GeoSeries(pts, crs=points_gdf.crs).union_all().convex_hull
-            records.append(hull)
-
-        except Exception as e:
-            print(f"Error at point {idx}: {e}")
-            continue
-
-    points_isochrones = points_gdf.copy()
-    points_isochrones['geometry'] = records
-
-    return points_isochrones
 
 def compute_isochrones(stops,G):
     RAIL_TYPES = {1, 2, 5, 12}
