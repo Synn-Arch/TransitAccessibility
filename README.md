@@ -1,4 +1,3 @@
-````markdown
 ![Transit Animation](docs/img/animation.gif)
 
 # Transit Accessibility Pipeline (GTFS + OSMnx)
