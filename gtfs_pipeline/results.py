@@ -35,7 +35,7 @@ def combine_scores(
         .clip(upper=22)
         / 22 * 12.6
     ).round(3)
-    bus_rail_score.drop(columns=['Transit_attribute'], errors='ignore', inplace=True)
+    bus_rail_score.drop(columns=['Transit_attribute', 'points_count', 'stops_computecount', 'sig_mean_mean', 'Transit_attribute', 'Score'], errors='ignore', inplace=True)
 
     return bus_rail_attributes, bus_rail_score
 

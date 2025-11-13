@@ -18,8 +18,16 @@ def main():
     print("Processing Data Complete")
 
     # Study Area
+    # POINTS_EPSG4326.geojson - GeoJSON of points extracted from the ./../../step1_loader step.
     # LINE_EPSG4326.geojson - GeoJSON of road segments extracted from the ./../../step1_loader step.
-    roads_gdf = gpd.read_file("data/map_v3.0_centerline.geojson")
+    points_gdf = gpd.read_file("data/POINT_EPSG4326.geojson")
+    roads_gdf = gpd.read_file("data/LINE_EPSG4326.geojson")
+    roads_gdf = (
+        roads_gdf[roads_gdf['link_id'].isin(points_gdf['link_id'])]
+        .drop_duplicates(subset='link_id')
+        .reset_index(drop=True)
+    )
+
     print("Study Area Load")
 
     # Check Existence of Bus or Subway
@@ -33,6 +41,7 @@ def main():
         print("⚠️ No rail stops found in this city.")
     print(f"{len(stops_bymode)} Stops will be processed")
 
+    # Calculate UTM zone
     streets = roads_gdf.copy()
     first_geom = streets.geometry.iloc[0]
     lon, lat = first_geom.coords[0]

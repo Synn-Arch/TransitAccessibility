@@ -1,0 +1,12 @@
+{
+"type": "FeatureCollection",
+"name": "Transit_Accessibility_SCORE",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "link_id": "cluster2_secondary_15_6", "name": "Central Avenue Southwest", "Transit_score": 7.829 }, "geometry": { "type": "LineString", "coordinates": [ [ -84.392341168597198, 33.747520653246546 ], [ -84.391986358335885, 33.747972256914437 ] ] } },
+{ "type": "Feature", "properties": { "link_id": "cluster2_secondary_31_17", "name": "Joseph E. Lowery Boulevard", "Transit_score": 7.229 }, "geometry": { "type": "LineString", "coordinates": [ [ -84.417489008726079, 33.761601199417015 ], [ -84.417494977681486, 33.7610608004209 ] ] } },
+{ "type": "Feature", "properties": { "link_id": "cluster2_secondary_40_3", "name": "Monroe Drive Northeast", "Transit_score": 3.205 }, "geometry": { "type": "LineString", "coordinates": [ [ -84.370627999476483, 33.775853268370518 ], [ -84.370458603191281, 33.776374532269223 ] ] } },
+{ "type": "Feature", "properties": { "link_id": "cluster2_secondary_57_3", "name": "Ralph McGill Boulevard", "Transit_score": 2.435 }, "geometry": { "type": "LineString", "coordinates": [ [ -84.380333721173329, 33.764166916470813 ], [ -84.379686757203658, 33.764149936068449 ] ] } },
+{ "type": "Feature", "properties": { "link_id": "cluster2_tertiary_27_7", "name": "Flat Shoals Avenue Southeast", "Transit_score": 3.938 }, "geometry": { "type": "LineString", "coordinates": [ [ -84.343176061348373, 33.738421426548079 ], [ -84.3435975, 33.7387508 ], [ -84.34364819339514, 33.738790415905235 ] ] } }
+]
+}
