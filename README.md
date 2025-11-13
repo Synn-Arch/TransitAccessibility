@@ -10,7 +10,8 @@ It outputs both an **interactive Folium map** and structured **CSV/GeoJSON** fil
 
 A **GeoJSON file** representing road segment links (EPSG:4326), along with:
 
-- One or more **GTFS `.zip` files**
+- One or more **GTFS`.zip` files**
+- A GeoJSON file of road segment points
 - (Optional) Amenity score file (`all_scores.json`) to enrich bus stop facility scoring
 
 ## Process
@@ -23,9 +24,9 @@ A **GeoJSON file** representing road segment links (EPSG:4326), along with:
 
 ## Output
 
-- **Interactive map** (Folium)  
-- **CSV file** with link-level accessibility scores  
-- **GeoJSON files** representing combined and scaled transit accessibility attributes  
+- **Interactive map** (HTML)
+- **CSV file** with road segment-level transit accessibility scores  
+- **GeoJSON files** with road segment-level transit accessibility scores 
 
 ## 📦 Features
 
@@ -68,10 +69,11 @@ Your project directory should contain:
 
 ```
 data/
-├─ gtfs/                  # One or more GTFS .zip files
+├─ gtfs/                  
+│  └─ gtfs.zip            # One or more GTFS .zip files (can be various names)
 ├─ amenities/
 │  └─ all_scores.json     # Optional amenity score dictionary
-├─ output/                # Output folder (auto-created)
+├─ output/                # Output folder
 └─ LINE_EPSG4326.geojson  # Road network (EPSG:4326)
 ```
 
@@ -82,7 +84,7 @@ data/
 3. (Optional) Add amenity data in:
    `data/amenities/all_scores.json`
 
-If no amenity data is provided, the pipeline still executes normally.
+If no amenity data is provided, the pipeline still executes without evaluating quality score.
 
 #### 2-1. What Is GTFS & How to Get It
 
