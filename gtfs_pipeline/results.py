@@ -47,11 +47,8 @@ def persist_and_plot(
     output_dir = "data/output"
     os.makedirs(output_dir, exist_ok=True)
 
-    html_path = os.path.join(output_dir, "Transit_Attributes_Map.html")
-    plot(bus_rail_attributes, place_geometry, score_column="Transit_attribute", filename=html_path)
+    html_path = os.path.join(output_dir, "Transit_Accessibility_Map.html")
+    plot(bus_rail_score, place_geometry, score_column="Transit_attribute", filename=html_path)
 
-    file_path = os.path.join(output_dir, "Transit_ATTRIBUTE.geojson")
-    bus_rail_attributes.to_file(file_path, driver="GeoJSON")
-
-    file_path = os.path.join(output_dir, "Transit_SCORE.geojson")
+    file_path = os.path.join(output_dir, "Transit_Accessibility_SCORE.geojson")
     bus_rail_score.to_file(file_path, driver="GeoJSON")
